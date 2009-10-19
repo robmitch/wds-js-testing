@@ -1,0 +1,47 @@
+require "spec/rake/spectask"
+
+require 'selenium/rake/tasks'
+
+Selenium::Rake::RemoteControlStartTask.new do |rc|
+  rc.port = 4444
+  rc.timeout_in_seconds = 15
+  rc.background = true
+  rc.wait_until_up_and_running = true
+  rc.jar_file = "spec/lib/selenium-server.jar"
+  rc.additional_args << "-singleWindow"
+  rc.wait_until_up_and_running=true
+end
+
+Selenium::Rake::RemoteControlStopTask.new('selenium:rc:stop') do |rc|
+  rc.host = "localhost"
+  rc.port = 4444
+  rc.timeout_in_seconds = 15
+end
+  
+task :default => ["spec:javascript", "spec:selenium"]
+
+desc "Run the JavaScript tests (in Safari)"
+task "spec:javascript" do
+  sh("screwdriver spec/javascript/suite.html --browser Safari")
+end
+
+desc "Run the JavaScript tests (in Rhino)"
+task "spec:javascript:headless" do
+  base_dir = "spec/vendor"
+  sh "java -jar #{File.join(base_dir, 'js.jar')} -w -debug #{File.join(base_dir, 'rhino', 'runner.js')}"  
+end
+
+desc "Run the Watir tests (in Safari)"
+Spec::Rake::SpecTask.new("spec:watir") do |spec|
+  spec.libs << 'spec'
+  spec.spec_files = FileList['spec/watir/*_spec.rb']
+end
+
+desc "Run the Selenium tests (in Safari)"
+task "spec:selenium" => ["selenium:rc:start", "spec:selenium:execute", "selenium:rc:stop"]
+
+ENV["SELENIUM_BROWSER"] = "*safari"
+Spec::Rake::SpecTask.new("spec:selenium:execute") do |spec|
+  spec.libs << "spec"
+  spec.spec_files = FileList['spec/selenium/*_spec.rb']
+end
